@@ -31,14 +31,49 @@ function log(line) {
   {
     const t = tokens.muyuan; const p = await ctx.newPage();
     try {
-      await p.goto('https://muyuan.do/login', { waitUntil: 'domcontentloaded', timeout: 60000 });
-      await p.waitForTimeout(1500);
+      await p.goto('https://muyuan.do/login', { waitUntil: 'networkidle', timeout: 60000 });
+      await p.waitForTimeout(2000);
       const res = await p.evaluate(async (a) => {
-        try { const r = await fetch('https://muyuan.do/api/user/checkin', { method: 'POST', headers: { 'Authorization': a.token, 'New-Api-User': String(a.uid), 'Content-Type': 'application/json' } }); let j = {}; try { j = JSON.parse(await r.text()); } catch (e) {} return { status: r.status, success: j.success, message: j.message }; } catch (e) { return { netErr: e.message }; }
+        try {
+          // 签到前查询余额
+          const before = await fetch('https://muyuan.do/api/user/self', { headers: { 'Authorization': a.token, 'New-Api-User': String(a.uid) } });
+          let beforeData = {};
+          try { beforeData = JSON.parse(await before.text()); } catch (e) {}
+          const quotaBefore = beforeData.data && beforeData.data.quota;
+
+          // 执行签到
+          const r = await fetch('https://muyuan.do/api/user/checkin', { method: 'POST', headers: { 'Authorization': a.token, 'New-Api-User': String(a.uid), 'Content-Type': 'application/json' } });
+          let j = {};
+          try { j = JSON.parse(await r.text()); } catch (e) {}
+
+          // 签到后查询余额
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          const after = await fetch('https://muyuan.do/api/user/self', { headers: { 'Authorization': a.token, 'New-Api-User': String(a.uid) } });
+          let afterData = {};
+          try { afterData = JSON.parse(await after.text()); } catch (e) {}
+          const quotaAfter = afterData.data && afterData.data.quota;
+
+          return { status: r.status, success: j.success, message: j.message, quotaBefore, quotaAfter };
+        } catch (e) { return { netErr: e.message }; }
       }, t);
       if (res.netErr) { log(`君の公益: ❌ 网络异常 ${res.netErr}`); bad++; }
-      else if (res.success === true) { log(`君の公益: ✅ 签到成功 ${res.message || ''}`.trim()); ok++; }
-      else if (res.success === false && /已签到|签到过|already/i.test(res.message || '')) { log(`君の公益: ✅ 今日已签到`); ok++; }
+      else if (res.success === true) {
+        let msg = `君の公益: ✅ 签到成功`;
+        if (res.quotaBefore !== undefined && res.quotaAfter !== undefined) {
+          const change = res.quotaAfter - res.quotaBefore;
+          msg += ` | 余额: $${(res.quotaBefore / 500000).toFixed(2)} → $${(res.quotaAfter / 500000).toFixed(2)}`;
+          if (change > 0) msg += ` (+$${(change / 500000).toFixed(2)})`;
+        }
+        if (res.message) msg += ` | ${res.message}`;
+        log(msg);
+        ok++;
+      }
+      else if (res.success === false && /已签到|签到过|already/i.test(res.message || '')) {
+        let msg = `君の公益: ✅ 今日已签到`;
+        if (res.quotaBefore !== undefined) msg += ` | 当前余额: $${(res.quotaBefore / 500000).toFixed(2)}`;
+        log(msg);
+        ok++;
+      }
       else if (res.status === 401) { log(`君の公益: 🔑 令牌失效，请重新运行 relogin-gettoken.js`); bad++; }
       else { log(`君の公益: ⚠️ status=${res.status} success=${res.success} msg=${res.message || ''}`); bad++; }
     } catch (e) { log(`君の公益: ❌ 异常 ${e.message}`); bad++; }
@@ -57,6 +92,13 @@ function log(line) {
         await p.waitForTimeout(1500);
         const res = await p.evaluate(async (a) => {
           try {
+            // 签到前查询余额
+            const before = await fetch('https://free.lyclaude.site/api/user/self', { headers: { 'Authorization': a.token, 'New-Api-User': String(a.uid) } });
+            let beforeData = {};
+            try { beforeData = JSON.parse(await before.text()); } catch (e) {}
+            const quotaBefore = beforeData.data && beforeData.data.quota;
+
+            // 执行签到
             const r = await fetch('https://free.lyclaude.site/api/user/checkin', {
               method: 'POST',
               headers: {
@@ -67,18 +109,41 @@ function log(line) {
             });
             let j = {};
             try { j = JSON.parse(await r.text()); } catch (e) {}
-            return { status: r.status, success: j.success, message: j.message };
+
+            // 签到后查询余额
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            const after = await fetch('https://free.lyclaude.site/api/user/self', { headers: { 'Authorization': a.token, 'New-Api-User': String(a.uid) } });
+            let afterData = {};
+            try { afterData = JSON.parse(await after.text()); } catch (e) {}
+            const quotaAfter = afterData.data && afterData.data.quota;
+
+            return { status: r.status, success: j.success, message: j.message, quotaBefore, quotaAfter };
           } catch (e) {
             return { netErr: e.message };
           }
         }, t);
-        if (res.netErr) { log(`LyClaude: network error ${res.netErr}`); bad++; }
-        else if (res.success === true) { log(`LyClaude: check-in success ${res.message || ''}`.trim()); ok++; }
-        else if (res.success === false && /already|今日|已签到|已簽到|signed/i.test(res.message || '')) { log('LyClaude: already checked in today'); ok++; }
-        else if (res.status === 401) { log('LyClaude: token expired, run relogin-gettoken.js'); bad++; }
-        else { log(`LyClaude: status=${res.status} success=${res.success} msg=${res.message || ''}`); bad++; }
+        if (res.netErr) { log(`LyClaude: ❌ 网络异常 ${res.netErr}`); bad++; }
+        else if (res.success === true) {
+          let msg = `LyClaude: ✅ 签到成功`;
+          if (res.quotaBefore !== undefined && res.quotaAfter !== undefined) {
+            const change = res.quotaAfter - res.quotaBefore;
+            msg += ` | 余额: $${(res.quotaBefore / 500000).toFixed(2)} → $${(res.quotaAfter / 500000).toFixed(2)}`;
+            if (change > 0) msg += ` (+$${(change / 500000).toFixed(2)})`;
+          }
+          if (res.message) msg += ` | ${res.message}`;
+          log(msg);
+          ok++;
+        }
+        else if (res.success === false && /already|今日|已签到|已簽到|signed/i.test(res.message || '')) {
+          let msg = `LyClaude: ✅ 今日已签到`;
+          if (res.quotaBefore !== undefined) msg += ` | 当前余额: $${(res.quotaBefore / 500000).toFixed(2)}`;
+          log(msg);
+          ok++;
+        }
+        else if (res.status === 401) { log('LyClaude: 🔑 令牌失效，请重新运行 relogin-gettoken.js'); bad++; }
+        else { log(`LyClaude: ⚠️ status=${res.status} success=${res.success} msg=${res.message || ''}`); bad++; }
       }
-    } catch (e) { log(`LyClaude: error ${e.message}`); bad++; }
+    } catch (e) { log(`LyClaude: ❌ 异常 ${e.message}`); bad++; }
     await p.close().catch(() => {});
   }
 
@@ -86,13 +151,34 @@ function log(line) {
   {
     const t = tokens.anyrouter; const p = await ctx.newPage();
     try {
+      // 签到前查询余额
+      const resBefore = await p.evaluate(async (a) => {
+        try { const r = await fetch('https://anyrouter.top/api/user/self', { headers: { 'Authorization': a.token, 'New-Api-User': String(a.uid) } }); let j = {}; try { j = JSON.parse(await r.text()); } catch (e) {} return { status: r.status, quota: j.data && j.data.quota }; } catch (e) { return { netErr: e.message }; }
+      }, t);
+
+      // 访问首页触发自动发放
       await p.goto('https://anyrouter.top/', { waitUntil: 'networkidle', timeout: 60000 });
       await p.waitForTimeout(4000);
+
+      // 签到后查询余额
       const res = await p.evaluate(async (a) => {
         try { const r = await fetch('https://anyrouter.top/api/user/self', { headers: { 'Authorization': a.token, 'New-Api-User': String(a.uid) } }); let j = {}; try { j = JSON.parse(await r.text()); } catch (e) {} return { status: r.status, quota: j.data && j.data.quota }; } catch (e) { return { netErr: e.message }; }
       }, t);
+
       if (res.netErr) { log(`AnyRouter: ❌ 网络异常 ${res.netErr}`); bad++; }
-      else if (res.status === 200) { log(`AnyRouter: ✅ 已访问首页（自动发放），余额约 $${(res.quota / 500000).toFixed(2)}`); ok++; }
+      else if (res.status === 200) {
+        let msg = `AnyRouter: ✅ 已访问首页（自动发放）`;
+        if (resBefore.quota !== undefined && res.quota !== undefined) {
+          const change = res.quota - resBefore.quota;
+          msg += ` | 余额: $${(resBefore.quota / 500000).toFixed(2)} → $${(res.quota / 500000).toFixed(2)}`;
+          if (change > 0) msg += ` (+$${(change / 500000).toFixed(2)})`;
+          else if (change === 0) msg += ` (无变化)`;
+        } else if (res.quota !== undefined) {
+          msg += ` | 当前余额: $${(res.quota / 500000).toFixed(2)}`;
+        }
+        log(msg);
+        ok++;
+      }
       else if (res.status === 401) { log(`AnyRouter: 🔑 令牌失效，请重新运行 relogin-gettoken.js`); bad++; }
       else { log(`AnyRouter: ⚠️ status=${res.status}`); bad++; }
     } catch (e) { log(`AnyRouter: ❌ 异常 ${e.message}`); bad++; }
@@ -111,6 +197,13 @@ function log(line) {
         await p.waitForTimeout(1500);
         const res = await p.evaluate(async (a) => {
           try {
+            // 签到前查询余额
+            const before = await fetch('https://ai.1692958.xyz/api/user/self', { headers: { 'Authorization': a.token, 'New-Api-User': String(a.uid) } });
+            let beforeData = {};
+            try { beforeData = JSON.parse(await before.text()); } catch (e) {}
+            const quotaBefore = beforeData.data && beforeData.data.quota;
+
+            // 执行签到
             const r = await fetch('https://ai.1692958.xyz/api/user/checkin', {
               method: 'POST',
               headers: {
@@ -121,14 +214,37 @@ function log(line) {
             });
             let j = {};
             try { j = JSON.parse(await r.text()); } catch (e) {}
-            return { status: r.status, success: j.success, message: j.message };
+
+            // 签到后查询余额
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            const after = await fetch('https://ai.1692958.xyz/api/user/self', { headers: { 'Authorization': a.token, 'New-Api-User': String(a.uid) } });
+            let afterData = {};
+            try { afterData = JSON.parse(await after.text()); } catch (e) {}
+            const quotaAfter = afterData.data && afterData.data.quota;
+
+            return { status: r.status, success: j.success, message: j.message, quotaBefore, quotaAfter };
           } catch (e) {
             return { netErr: e.message };
           }
         }, t);
         if (res.netErr) { log(`AI1692958: ❌ 网络异常 ${res.netErr}`); bad++; }
-        else if (res.success === true) { log(`AI1692958: ✅ 签到成功 ${res.message || ''}`.trim()); ok++; }
-        else if (res.success === false && /already|今日|已签到|已簽到|signed/i.test(res.message || '')) { log('AI1692958: ✅ 今日已签到'); ok++; }
+        else if (res.success === true) {
+          let msg = `AI1692958: ✅ 签到成功`;
+          if (res.quotaBefore !== undefined && res.quotaAfter !== undefined) {
+            const change = res.quotaAfter - res.quotaBefore;
+            msg += ` | 余额: $${(res.quotaBefore / 500000).toFixed(2)} → $${(res.quotaAfter / 500000).toFixed(2)}`;
+            if (change > 0) msg += ` (+$${(change / 500000).toFixed(2)})`;
+          }
+          if (res.message) msg += ` | ${res.message}`;
+          log(msg);
+          ok++;
+        }
+        else if (res.success === false && /already|今日|已签到|已簽到|signed/i.test(res.message || '')) {
+          let msg = `AI1692958: ✅ 今日已签到`;
+          if (res.quotaBefore !== undefined) msg += ` | 当前余额: $${(res.quotaBefore / 500000).toFixed(2)}`;
+          log(msg);
+          ok++;
+        }
         else if (res.status === 401) { log('AI1692958: 🔑 令牌失效，请重新运行 relogin-gettoken.js'); bad++; }
         else { log(`AI1692958: ⚠️ status=${res.status} success=${res.success} msg=${res.message || ''}`); bad++; }
       }
