@@ -15,6 +15,7 @@ const SITES = [
   { key: 'muyuan', origin: 'https://muyuan.do', uid: 17627, login: 'https://muyuan.do/login', check: 'https://muyuan.do/console', outRe: /login|expired/i },
   { key: 'lyclaude', origin: 'https://free.lyclaude.site', uid: '', login: 'https://free.lyclaude.site/', check: 'https://free.lyclaude.site/console', outRe: /login|signin|\/auth/i },
   { key: 'ai1692958', origin: 'https://ai.1692958.xyz', uid: '', login: 'https://ai.1692958.xyz/login', check: 'https://ai.1692958.xyz/console/personal', outRe: /login|signin|\/auth/i },
+  { key: 'gyapi', origin: 'https://gyapi.zxiaoruan.cn', uid: '', login: 'https://gyapi.zxiaoruan.cn/sign-in', check: 'https://gyapi.zxiaoruan.cn/profile', outRe: /sign-in|login/i },
 ];
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 async function waitCDP(ms) {

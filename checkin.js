@@ -252,7 +252,74 @@ function log(line) {
     await p.close().catch(() => {});
   }
 
+  // gyapi：令牌调签到
+  {
+    const t = tokens.gyapi; const p = await ctx.newPage();
+    try {
+      if (!t || !t.token) {
+        log('GyAPI: token missing, run relogin-gettoken.js after logging in to https://gyapi.zxiaoruan.cn/');
+        bad++;
+      } else {
+        await p.goto('https://gyapi.zxiaoruan.cn/profile', { waitUntil: 'domcontentloaded', timeout: 60000 });
+        await p.waitForTimeout(1500);
+        const res = await p.evaluate(async (a) => {
+          try {
+            // 签到前查询余额
+            const before = await fetch('https://gyapi.zxiaoruan.cn/api/user/self', { headers: { 'Authorization': a.token, 'New-Api-User': String(a.uid) } });
+            let beforeData = {};
+            try { beforeData = JSON.parse(await before.text()); } catch (e) {}
+            const quotaBefore = beforeData.data && beforeData.data.quota;
+
+            // 执行签到
+            const r = await fetch('https://gyapi.zxiaoruan.cn/api/user/checkin', {
+              method: 'POST',
+              headers: {
+                'Authorization': a.token,
+                'New-Api-User': String(a.uid),
+                'Content-Type': 'application/json'
+              }
+            });
+            let j = {};
+            try { j = JSON.parse(await r.text()); } catch (e) {}
+
+            // 签到后查询余额
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            const after = await fetch('https://gyapi.zxiaoruan.cn/api/user/self', { headers: { 'Authorization': a.token, 'New-Api-User': String(a.uid) } });
+            let afterData = {};
+            try { afterData = JSON.parse(await after.text()); } catch (e) {}
+            const quotaAfter = afterData.data && afterData.data.quota;
+
+            return { status: r.status, success: j.success, message: j.message, quotaBefore, quotaAfter };
+          } catch (e) {
+            return { netErr: e.message };
+          }
+        }, t);
+        if (res.netErr) { log(`GyAPI: ❌ 网络异常 ${res.netErr}`); bad++; }
+        else if (res.success === true) {
+          let msg = `GyAPI: ✅ 签到成功`;
+          if (res.quotaBefore !== undefined && res.quotaAfter !== undefined) {
+            const change = res.quotaAfter - res.quotaBefore;
+            msg += ` | 余额: $${(res.quotaBefore / 500000).toFixed(2)} → $${(res.quotaAfter / 500000).toFixed(2)}`;
+            if (change > 0) msg += ` (+$${(change / 500000).toFixed(2)})`;
+          }
+          if (res.message) msg += ` | ${res.message}`;
+          log(msg);
+          ok++;
+        }
+        else if (res.success === false && /already|今日|已签到|已簽到|signed/i.test(res.message || '')) {
+          let msg = `GyAPI: ✅ 今日已签到`;
+          if (res.quotaBefore !== undefined) msg += ` | 当前余额: $${(res.quotaBefore / 500000).toFixed(2)}`;
+          log(msg);
+          ok++;
+        }
+        else if (res.status === 401) { log('GyAPI: 🔑 令牌失效，请重新运行 relogin-gettoken.js'); bad++; }
+        else { log(`GyAPI: ⚠️ status=${res.status} success=${res.success} msg=${res.message || ''}`); bad++; }
+      }
+    } catch (e) { log(`GyAPI: ❌ 异常 ${e.message}`); bad++; }
+    await p.close().catch(() => {});
+  }
+
   await browser.close();
-  log(`本次完成：成功 ${ok}/4` + (bad ? `，${bad} 项需关注` : ''));
+  log(`本次完成：成功 ${ok}/5` + (bad ? `，${bad} 项需关注` : ''));
   process.exit(bad ? 1 : 0);
 })().catch(e => { log('FATAL ' + e.message); process.exit(1); });
