@@ -1,0 +1,12 @@
+[
+  {
+    "key": "example",
+    "name": "示例站点",
+    "origin": "https://example.com",
+    "uid": "",
+    "loginUrl": "https://example.com/login",
+    "checkUrl": "https://example.com/dashboard",
+    "checkinType": "api",
+    "apiPath": "/api/user/checkin"
+  }
+]

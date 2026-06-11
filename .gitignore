@@ -1,40 +1,11 @@
-# 敏感文件 - 包含登录态和令牌
-state.json
-tokens.json
-login-status.json
-
-# 进程 PID 文件
-*.pid
-
-# 日志文件
-*.log
-*.txt
-
-# Node.js
 node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# 截图和临时文件
-*.png
-shot-*.png
-exp-*.png
-fm-*.png
-
-# 用户数据目录
+tokens.json
+state.json
+sites-config.json
+checkin-log.txt
+*.output
 profile/
-
-# 探索和诊断脚本的输出
-*-report.json
-explore-*.js
-diag-*.js
-probe-*.js
-verify-*.js
-
-# 编辑器
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
+extract-report.json
+login-status.json
+verify-report.json
+explore-report.json
