@@ -11,11 +11,12 @@ const PORT = 9222;
 const STATE = path.join(__dirname, 'state.json');
 const TOKENS = path.join(__dirname, 'tokens.json');
 const SITES = [
-  { key: 'anyrouter', origin: 'https://anyrouter.top', uid: 161762, login: 'https://anyrouter.top/login', check: 'https://anyrouter.top/console', outRe: /login|signin|\/auth/i },
-  { key: 'muyuan', origin: 'https://muyuan.do', uid: 17627, login: 'https://muyuan.do/login', check: 'https://muyuan.do/console', outRe: /login|expired/i },
+  { key: 'anyrouter', origin: 'https://anyrouter.top', uid: '', login: 'https://anyrouter.top/login', check: 'https://anyrouter.top/console', outRe: /login|signin|\/auth/i },
+  { key: 'muyuan', origin: 'https://muyuan.do', uid: '', login: 'https://muyuan.do/login', check: 'https://muyuan.do/console', outRe: /login|expired/i },
   { key: 'lyclaude', origin: 'https://free.lyclaude.site', uid: '', login: 'https://free.lyclaude.site/', check: 'https://free.lyclaude.site/console', outRe: /login|signin|\/auth/i },
   { key: 'ai1692958', origin: 'https://ai.1692958.xyz', uid: '', login: 'https://ai.1692958.xyz/login', check: 'https://ai.1692958.xyz/console/personal', outRe: /login|signin|\/auth/i },
   { key: 'gyapi', origin: 'https://gyapi.zxiaoruan.cn', uid: '', login: 'https://gyapi.zxiaoruan.cn/sign-in', check: 'https://gyapi.zxiaoruan.cn/profile', outRe: /sign-in|login/i },
+  { key: 'chybenzun', origin: 'https://chybenzun.top', uid: '', login: 'https://chybenzun.top/sign-in', check: 'https://chybenzun.top/profile', outRe: /sign-in|login/i },
 ];
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 async function waitCDP(ms) {

@@ -10,6 +10,7 @@ const { chromium } = require('playwright-core');
 const STATE = path.join(__dirname, 'state.json');
 const TOKENS = path.join(__dirname, 'tokens.json');
 const LOG = path.join(__dirname, 'checkin-log.txt');
+const RELOGIN = path.join(__dirname, 'relogin-gettoken.js');
 
 function log(line) {
   const d = new Date();
@@ -26,6 +27,7 @@ function log(line) {
   const browser = await chromium.launch({ channel: 'msedge', headless: true });
   const ctx = await browser.newContext({ storageState: STATE });
   let ok = 0, bad = 0;
+  const expiredSites = [];  // 记录令牌失效的站点
 
   // muyuan：令牌调签到
   {
@@ -74,7 +76,7 @@ function log(line) {
         log(msg);
         ok++;
       }
-      else if (res.status === 401) { log(`君の公益: 🔑 令牌失效，请重新运行 relogin-gettoken.js`); bad++; }
+      else if (res.status === 401) { log(`君の公益: 🔑 令牌失效，请重新运行 relogin-gettoken.js`); bad++; expiredSites.push('muyuan'); }
       else { log(`君の公益: ⚠️ status=${res.status} success=${res.success} msg=${res.message || ''}`); bad++; }
     } catch (e) { log(`君の公益: ❌ 异常 ${e.message}`); bad++; }
     await p.close().catch(() => {});
@@ -140,7 +142,7 @@ function log(line) {
           log(msg);
           ok++;
         }
-        else if (res.status === 401) { log('LyClaude: 🔑 令牌失效，请重新运行 relogin-gettoken.js'); bad++; }
+        else if (res.status === 401) { log('LyClaude: 🔑 令牌失效，请重新运行 relogin-gettoken.js'); bad++; expiredSites.push('lyclaude'); }
         else { log(`LyClaude: ⚠️ status=${res.status} success=${res.success} msg=${res.message || ''}`); bad++; }
       }
     } catch (e) { log(`LyClaude: ❌ 异常 ${e.message}`); bad++; }
@@ -179,7 +181,7 @@ function log(line) {
         log(msg);
         ok++;
       }
-      else if (res.status === 401) { log(`AnyRouter: 🔑 令牌失效，请重新运行 relogin-gettoken.js`); bad++; }
+      else if (res.status === 401) { log(`AnyRouter: 🔑 令牌失效，请重新运行 relogin-gettoken.js`); bad++; expiredSites.push('anyrouter'); }
       else { log(`AnyRouter: ⚠️ status=${res.status}`); bad++; }
     } catch (e) { log(`AnyRouter: ❌ 异常 ${e.message}`); bad++; }
     await p.close().catch(() => {});
@@ -245,7 +247,7 @@ function log(line) {
           log(msg);
           ok++;
         }
-        else if (res.status === 401) { log('AI1692958: 🔑 令牌失效，请重新运行 relogin-gettoken.js'); bad++; }
+        else if (res.status === 401) { log('AI1692958: 🔑 令牌失效，请重新运行 relogin-gettoken.js'); bad++; expiredSites.push('ai1692958'); }
         else { log(`AI1692958: ⚠️ status=${res.status} success=${res.success} msg=${res.message || ''}`); bad++; }
       }
     } catch (e) { log(`AI1692958: ❌ 异常 ${e.message}`); bad++; }
@@ -312,14 +314,79 @@ function log(line) {
           log(msg);
           ok++;
         }
-        else if (res.status === 401) { log('GyAPI: 🔑 令牌失效，请重新运行 relogin-gettoken.js'); bad++; }
+        else if (res.status === 401) { log('GyAPI: 🔑 令牌失效，请重新运行 relogin-gettoken.js'); bad++; expiredSites.push('gyapi'); }
         else { log(`GyAPI: ⚠️ status=${res.status} success=${res.success} msg=${res.message || ''}`); bad++; }
       }
     } catch (e) { log(`GyAPI: ❌ 异常 ${e.message}`); bad++; }
     await p.close().catch(() => {});
   }
 
+  // chybenzun：令牌调签到
+  {
+    const t = tokens.chybenzun; const p = await ctx.newPage();
+    try {
+      if (!t || !t.token) {
+        log('CHY本尊: token missing, run relogin-gettoken.js after logging in to https://chybenzun.top/sign-in');
+        bad++;
+      } else {
+        await p.goto('https://chybenzun.top/profile', { waitUntil: 'domcontentloaded', timeout: 60000 });
+        await p.waitForTimeout(1500);
+        const res = await p.evaluate(async (a) => {
+          try {
+            const before = await fetch('https://chybenzun.top/api/user/self', { headers: { 'Authorization': a.token, 'New-Api-User': String(a.uid) } });
+            let beforeData = {};
+            try { beforeData = JSON.parse(await before.text()); } catch (e) {}
+            const quotaBefore = beforeData.data && beforeData.data.quota;
+            const r = await fetch('https://chybenzun.top/api/user/checkin', {
+              method: 'POST',
+              headers: { 'Authorization': a.token, 'New-Api-User': String(a.uid), 'Content-Type': 'application/json' }
+            });
+            let j = {};
+            try { j = JSON.parse(await r.text()); } catch (e) {}
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            const after = await fetch('https://chybenzun.top/api/user/self', { headers: { 'Authorization': a.token, 'New-Api-User': String(a.uid) } });
+            let afterData = {};
+            try { afterData = JSON.parse(await after.text()); } catch (e) {}
+            const quotaAfter = afterData.data && afterData.data.quota;
+            return { status: r.status, success: j.success, message: j.message, quotaBefore, quotaAfter };
+          } catch (e) { return { netErr: e.message }; }
+        }, t);
+        if (res.netErr) { log(`CHY本尊: ❌ 网络异常 ${res.netErr}`); bad++; }
+        else if (res.success === true) {
+          let msg = `CHY本尊: ✅ 签到成功`;
+          if (res.quotaBefore !== undefined && res.quotaAfter !== undefined) {
+            const change = res.quotaAfter - res.quotaBefore;
+            msg += ` | 余额: $${(res.quotaBefore / 500000).toFixed(2)} → $${(res.quotaAfter / 500000).toFixed(2)}`;
+            if (change > 0) msg += ` (+$${(change / 500000).toFixed(2)})`;
+          }
+          if (res.message) msg += ` | ${res.message}`;
+          log(msg); ok++;
+        }
+        else if (res.success === false && /already|今日|已签到|已簽到|signed/i.test(res.message || '')) {
+          let msg = `CHY本尊: ✅ 今日已签到`;
+          if (res.quotaBefore !== undefined) msg += ` | 当前余额: $${(res.quotaBefore / 500000).toFixed(2)}`;
+          log(msg); ok++;
+        }
+        else if (res.status === 401) { log('CHY本尊: 🔑 令牌失效，请重新运行 relogin-gettoken.js'); bad++; expiredSites.push('chybenzun'); }
+        else { log(`CHY本尊: ⚠️ status=${res.status} success=${res.success} msg=${res.message || ''}`); bad++; }
+      }
+    } catch (e) { log(`CHY本尊: ❌ 异常 ${e.message}`); bad++; }
+    await p.close().catch(() => {});
+  }
+
   await browser.close();
-  log(`本次完成：成功 ${ok}/5` + (bad ? `，${bad} 项需关注` : ''));
-  process.exit(bad ? 1 : 0);
+  log(`本次完成：成功 ${ok}/6` + (bad ? `，${bad} 项需关注` : ''));
+
+  // 如果有令牌失效，自动触发重新登录
+  if (expiredSites.length > 0) {
+    log(`检测到 ${expiredSites.length} 个站点令牌失效 [${expiredSites.join(', ')}]，自动启动重新登录...`);
+    const { spawn } = require('child_process');
+    const child = spawn(process.execPath, [RELOGIN], { cwd: __dirname, detached: false, stdio: 'inherit' });
+    child.on('exit', (code) => {
+      log(`relogin-gettoken.js 退出，exit code=${code}`);
+      process.exit(code || (bad ? 1 : 0));
+    });
+  } else {
+    process.exit(bad ? 1 : 0);
+  }
 })().catch(e => { log('FATAL ' + e.message); process.exit(1); });
