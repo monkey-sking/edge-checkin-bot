@@ -1,5 +1,9 @@
 # Edge Checkin Bot
 
+<!-- badges:start -->
+[![License](https://img.shields.io/github/license/monkey-sking/edge-checkin-bot?style=flat-square)](https://github.com/monkey-sking/edge-checkin-bot/blob/main/LICENSE) [![Last commit](https://img.shields.io/github/last-commit/monkey-sking/edge-checkin-bot?style=flat-square)](https://github.com/monkey-sking/edge-checkin-bot/commits/main) [![JavaScript](https://img.shields.io/github/languages/top/monkey-sking/edge-checkin-bot?style=flat-square)](https://github.com/monkey-sking/edge-checkin-bot/search?l=JavaScript) [![views](https://hits.sh/github.com/monkey-sking/edge-checkin-bot.svg?style=flat-square&label=views&color=0e75b6)](https://github.com/monkey-sking/edge-checkin-bot)
+<!-- badges:end -->
+
 AI 中转站每日自动签到机器人，支持多个站点令牌模式签到。
 
 ## 功能特性
